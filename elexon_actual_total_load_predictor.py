@@ -134,6 +134,31 @@ def analyse_historical_data():
 
     return analysis_results, dataframes
 
+def plot_data(actual_df, predictions_df=None):
+    """Plot actual load data and predictions if available"""
+    if actual_df is None:
+        print("No actual data available for plotting")
+        return
+    
+    plt.figure(figsize=(12, 6))
+    
+    # Plot actual data
+    actual_df = actual_df.sort_values('startTime')
+    plt.plot(actual_df['startTime'], actual_df['quantity'], 
+             label='Actual Total Load', color='blue')
+    
+    # Plot predictions if available
+    if predictions_df is not None:
+        plt.plot(predictions_df['startTime'], predictions_df['quantity'], 
+                 label='Predicted Load', color='orange', linestyle='--')
+    
+    plt.xlabel('Time')
+    plt.ylabel('Quantity (MW)')
+    plt.title('Actual Total Load and Predictions over Time')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
 if __name__ == "__main__":
     results, dfs = analyse_historical_data()
     for dataset, result in results.items():
@@ -149,24 +174,4 @@ if __name__ == "__main__":
         else:
             print(f"  {result}")
     
-    # Plotting
-    if 'Actual Total Load' in dfs and dfs['Actual Total Load'] is not None:
-        df = dfs['Actual Total Load'].sort_values('startTime')
-        plt.figure(figsize=(12,6))
-        plt.plot(df['startTime'], df['quantity'], label='Actual Total Load', color='blue')
-        
-        # Plot predictions on the same graph
-        if 'Predictions' in results and isinstance(results['Predictions'], dict):
-            sps = results['Predictions']['settlement_periods']
-            preds = results['Predictions']['predicted_quantities']
-            # Create future times
-            last_time = df['startTime'].max()
-            next_times = [last_time + pd.Timedelta(minutes=30 * i) for i in range(1, 49)]
-            plt.plot(next_times, preds, label='Predicted Load', color='orange', linestyle='--')
-        
-        plt.xlabel('Time')
-        plt.ylabel('Quantity (MW)')
-        plt.title('Actual Total Load and Predictions over Time')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
+    plot_data(dfs.get('Actual Total Load'), dfs.get('Predictions'))
