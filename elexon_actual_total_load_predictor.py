@@ -7,160 +7,197 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 import matplotlib.pyplot as plt
 
-# API Configuration
-BASE_URL = "https://data.elexon.co.uk/bmrs/api/v1"
-
-# Dictionary of datasets to track
-DATASETS = {
+class ElexonClient:
+    def __init__(self, base_url="https://data.elexon.co.uk/bmrs/api/v1"):
+        self.base_url = base_url
+        # Dictionary of datasets to track
+        self.datasets = {
             "Actual Total Load": "demand/actual/total",
             }
-# Looking at historical data from a specific week
-HISORICAL_DATES_FROM = "from=2025-12-10"
-HISORICAL_DATES_TO = "to=2025-12-17"
+        # Looking at historical data from a specific week
+        self.historical_dates_from = "from=2025-12-10"
+        self.historical_dates_to = "to=2025-12-17"
+        # Looking at settlement periods for the whole day
+        self.settlement_periods_from = "fromSettlementPeriod=1"
+        self.settlement_periods_to = "toSettlementPeriod=48"    
+        self.headers = {"accept": "application/json"} 
 
-# Looking at settlement periods for the whole day
-SETTLEMENT_PERIODS_FROM = "fromSettlementPeriod=1"
-SETTLEMENT_PERIODS_TO = "toSettlementPeriod=48"
+        print("[Elexon] Client initialised")
 
-def fetch_historical_data(endpoint):
-    """Fetch historical data for a given endpoint from Elexon API"""
-    headers = {
-        "accept": "application/json"
-    }
+    def test_connection(self, endpoint):
 
-    url = f"{BASE_URL}/{endpoint}?{HISORICAL_DATES_FROM}&{HISORICAL_DATES_TO}&{SETTLEMENT_PERIODS_FROM}&{SETTLEMENT_PERIODS_TO}"
+        url = f"{self.base_url}/{endpoint}?{self.historical_dates_from}&{self.historical_dates_to}&{self.settlement_periods_from}&{self.settlement_periods_to}"
 
-    try:
-        response = requests.get(url,headers=headers, params={"format": "json"})
-        if response.status_code == 200:
-            return response.json()
-        else:
-            print(f"Error Fetching {endpoint}: {response.status_code}")
+        try:
+            response = requests.get(url, headers=self.headers, timeout=5)
+            if response.status_code == 200:
+                print("[Elexon] Connection Successful!")
+                return True
+            else:
+                print(f"[Elexon] Connection Failed: {response.status_code}")
+                return False
+        except Exception as e:
+            print(f"[Elexon] Connection Error: {e}")
+            return False
+
+
+    def fetch_historical_data(self, endpoint):
+        """Fetch historical data for a given endpoint from Elexon API"""
+
+        url = f"{self.base_url}/{endpoint}?{self.historical_dates_from}&{self.historical_dates_to}&{self.settlement_periods_from}&{self.settlement_periods_to}"
+
+        try:
+            response = requests.get(url,headers=self.headers, timeout=5)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"[Elexon] Error Fetching {endpoint}: {response.status_code}")
+                return None
+        except Exception as e:
+            print(f"[Elexon] Exception fetching {endpoint}: {e}")
             return None
-    except Exception as e:
-        print(f"Exception fetching {endpoint}: {e}")
-        return None
     
+class LoadPredictor:
+    def __init__(self):
+        self.analysis_results = {}
+        self.dataframes = {}
+        self.client = ElexonClient()
 
-def analyse_historical_data():
-    """Fetch data and perform analysis"""
-    analysis_results = {}
-    dataframes = {}
+    def analyse_historical_data(self):
+        """Fetch data and perform analysis"""
 
-    for dataset_name, endpoint in DATASETS.items():
-        data = fetch_historical_data(endpoint)
+        for dataset_name, endpoint in self.client.datasets.items():
+            data = self.client.fetch_historical_data(endpoint)
 
-        if data and 'data' in data:
-            df = pd.DataFrame(data['data'])
+            if data and 'data' in data:
+                df = pd.DataFrame(data['data'])
 
-            # Convert startTime to datetime
-            if 'startTime' in df.columns:
-                df['startTime'] = pd.to_datetime(df['startTime'])
-                df = df.sort_values('startTime')
-            
-            # Convert relevant columns to numeric
-            df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
-            df['settlementPeriod'] = pd.to_numeric(df['settlementPeriod'], errors='coerce')
+                # Convert startTime to datetime
+                if 'startTime' in df.columns:
+                    df['startTime'] = pd.to_datetime(df['startTime'])
+                    df = df.sort_values('startTime')
+                
+                # Convert relevant columns to numeric
+                df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
+                df['settlementPeriod'] = pd.to_numeric(df['settlementPeriod'], errors='coerce')
 
+                df = df.dropna()
+
+                self.dataframes[dataset_name] = df
+
+                # Basic stats
+                self.analysis_results[dataset_name] = {
+                    'quantity_mean': df['quantity'].mean(),
+                    'quantity_std': df['quantity'].std(),
+                    'n_samples': len(df)
+                }
+            else:
+                self.analysis_results[dataset_name] = "No data available"
+                self.dataframes[dataset_name] = None
+
+        # Predict next 48 settlement periods using Random Forest
+        if 'Actual Total Load' in self.dataframes and self.dataframes['Actual Total Load'] is not None:
+            df = self.dataframes['Actual Total Load'].copy()
+
+            # Create lagged feature
+            df = df.sort_values('startTime')
+            df['lag1'] = df['quantity'].shift(1)
             df = df.dropna()
 
-            dataframes[dataset_name] = df
+            if len(df) > 0:
+                # Features: settlementPeriod and lag1
+                X = df[['settlementPeriod', 'lag1']].values  # Use .values to get numpy array
+                y = df['quantity']
 
-            # Basic stats
-            analysis_results[dataset_name] = {
-                'quantity_mean': df['quantity'].mean(),
-                'quantity_std': df['quantity'].std(),
-                'n_samples': len(df)
-            }
-        else:
-            analysis_results[dataset_name] = "No data available"
-            dataframes[dataset_name] = None
+                # Scale features
+                scaler = StandardScaler()
+                X_scaled = scaler.fit_transform(X)
 
-    # Predict next 48 settlement periods using Random Forest
-    if 'Actual Total Load' in dataframes and dataframes['Actual Total Load'] is not None:
-        df = dataframes['Actual Total Load'].copy()
+                # Train Random Forest
+                model = RandomForestRegressor(n_estimators=100, random_state=42)
+                model.fit(X_scaled, y)
 
-        # Create lagged feature
-        df = df.sort_values('startTime')
-        df['lag1'] = df['quantity'].shift(1)
-        df = df.dropna()
+                # Predict next 48 settlement periods
+                predictions = []
+                current_lag = df['quantity'].iloc[-1]  # Last quantity
+                current_sp = df['settlementPeriod'].iloc[-1]
 
-        if len(df) > 0:
-            # Features: settlementPeriod and lag1
-            X = df[['settlementPeriod', 'lag1']].values  # Use .values to get numpy array
-            y = df['quantity']
+                for i in range(48):
+                    next_sp = (current_sp % 48) + 1  # Cycle 1 to 48
+                    next_X = scaler.transform(np.array([[next_sp, current_lag]]))
+                    pred = model.predict(next_X)[0]
+                    predictions.append(float(pred))  # Ensure float
+                    current_lag = pred  # Use prediction as next lag
+                    current_sp = next_sp
 
-            # Scale features
-            scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X)
+                # Create predictions dataframe
+                last_time = df['startTime'].max()
+                next_times = [last_time + pd.Timedelta(minutes=30 * i) for i in range(1, 49)]
+                predictions_df = pd.DataFrame({
+                    'startTime': next_times,
+                    'settlementPeriod': list(range(1, 49)),
+                    'quantity': predictions,  # Already floats
+                    'is_predicted': True
+                })
+                self.dataframes['Predictions'] = predictions_df
 
-            # Train Random Forest
-            model = RandomForestRegressor(n_estimators=100, random_state=42)
-            model.fit(X_scaled, y)
+                print(f"\nPredicted quantities for next 48 settlement periods:")
+                print(predictions_df.to_string(index=False))
 
-            # Predict next 48 settlement periods
-            predictions = []
-            current_lag = df['quantity'].iloc[-1]  # Last quantity
-            current_sp = df['settlementPeriod'].iloc[-1]
+                self.analysis_results['Predictions'] = {
+                    'settlement_periods': list(range(1, 49)),
+                    'predicted_quantities': predictions
+                }
+            else:
+                self.analysis_results['Predictions'] = "Not enough data for prediction"
 
-            for i in range(48):
-                next_sp = (current_sp % 48) + 1  # Cycle 1 to 48
-                next_X = scaler.transform(np.array([[next_sp, current_lag]]))
-                pred = model.predict(next_X)[0]
-                predictions.append(float(pred))  # Ensure float
-                current_lag = pred  # Use prediction as next lag
-                current_sp = next_sp
+        return self.analysis_results, self.dataframes
 
-            # Create predictions dataframe
-            last_time = df['startTime'].max()
-            next_times = [last_time + pd.Timedelta(minutes=30 * i) for i in range(1, 49)]
-            predictions_df = pd.DataFrame({
-                'startTime': next_times,
-                'settlementPeriod': list(range(1, 49)),
-                'quantity': predictions,  # Already floats
-                'is_predicted': True
-            })
-            dataframes['Predictions'] = predictions_df
+    def plot_data(self,actual_df, predictions_df=None):
+        """Plot actual load data and predictions if available"""
+        if actual_df is None:
+            print("No actual data available for plotting")
+            return
+        
+        plt.figure(figsize=(12, 6))
+        
+        # Plot actual data
+        actual_df = actual_df.sort_values('startTime')
+        plt.plot(actual_df['startTime'], actual_df['quantity'], 
+                label='Actual Total Load', color='blue')
+        
+        # Plot predictions if available
+        if predictions_df is not None:
+            plt.plot(predictions_df['startTime'], predictions_df['quantity'], 
+                    label='Predicted Load', color='orange', linestyle='--')
+        
+        plt.xlabel('Time')
+        plt.ylabel('Quantity (MW)')
+        plt.title('Actual Total Load and Predictions over Time')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
 
-            print(f"Predicted quantities for next 48 settlement periods:")
-            print(predictions_df.to_string(index=False))
+def main():
+    print("\n" + "="*80)
+    print("ACTUAL LOAD PREDICTOR")
+    print("="*80)
 
-            analysis_results['Predictions'] = {
-                'settlement_periods': list(range(1, 49)),
-                'predicted_quantities': predictions
-            }
-        else:
-            analysis_results['Predictions'] = "Not enough data for prediction"
+    # Create Elexon Client
+    elexon = ElexonClient()
 
-    return analysis_results, dataframes
+    # Test connection for each dataset
+    for dataset_name, endpoint in elexon.datasets.items():
+        if not elexon.test_connection(endpoint):
+            print(f"[Main] Failed to connect to Elexon for {dataset_name}. Check Inputs.")
+            return
 
-def plot_data(actual_df, predictions_df=None):
-    """Plot actual load data and predictions if available"""
-    if actual_df is None:
-        print("No actual data available for plotting")
-        return
-    
-    plt.figure(figsize=(12, 6))
-    
-    # Plot actual data
-    actual_df = actual_df.sort_values('startTime')
-    plt.plot(actual_df['startTime'], actual_df['quantity'], 
-             label='Actual Total Load', color='blue')
-    
-    # Plot predictions if available
-    if predictions_df is not None:
-        plt.plot(predictions_df['startTime'], predictions_df['quantity'], 
-                 label='Predicted Load', color='orange', linestyle='--')
-    
-    plt.xlabel('Time')
-    plt.ylabel('Quantity (MW)')
-    plt.title('Actual Total Load and Predictions over Time')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    # Create Load Predictor
+    predictor = LoadPredictor()
+    results, dfs = predictor.analyse_historical_data()
 
-if __name__ == "__main__":
-    results, dfs = analyse_historical_data()
+    # Add datsets
+    results, dfs = predictor.analyse_historical_data()
     for dataset, result in results.items():
         print(f"\nAnalysis Results for {dataset}:")
         if isinstance(result, dict):
@@ -174,4 +211,10 @@ if __name__ == "__main__":
         else:
             print(f"  {result}")
     
-    plot_data(dfs.get('Actual Total Load'), dfs.get('Predictions'))
+    # Plotting Data
+    predictor.plot_data(dfs.get('Actual Total Load'), dfs.get('Predictions'))
+    print("[Main] Data Plot Complete!")
+    print("[Main] Total Load Prediction Complete!")
+
+if __name__ == "__main__":
+    main()
