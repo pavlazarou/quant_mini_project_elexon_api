@@ -1,7 +1,7 @@
 import requests
 import pandas as pd
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -55,7 +55,8 @@ class ElexonClient:
         except Exception as e:
             print(f"[Elexon] Exception fetching {endpoint}: {e}")
             return None
-class linear_regression_model:
+        
+class LinearRegressionModel:
     def __init__(self):
         self.client = ElexonClient()
         self.analysis_results = {}
@@ -110,11 +111,12 @@ class linear_regression_model:
             df_actual = self.dataframes["Actual Total Load"]
 
             join_keys = []
-            if"startTime" in df_demand.columns and "startTime" in df_actual.columns:
+            if "settlementDate" in df_demand.columns and "settlementDate" in df_actual.columns:
+                join_keys = ["settlementDate", "settlementPeriod"]
+            elif "startTime" in df_demand.columns and "startTime" in df_actual.columns:
                 join_keys = ["startTime", "settlementPeriod"]
             else:
-                # Fallback to settlementPeriod only
-                join_keys = ["settlementPeriod"]
+                raise ValueError("No reliable join keys found (need settlementDate or startTime plus settlementPeriod).")
 
             # Merge on settlementPeriod
             df_merged = pd.merge(df_demand, df_actual, on=join_keys, how='inner', suffixes=('_demand', '_actual'))
@@ -143,7 +145,8 @@ class linear_regression_model:
                 model.fit(X, y)
                 slopes = model.coef_[0]
                 intercept = model.intercept_
-                scores = cross_val_score(model, X, y, cv=3, scoring='r2')
+                tscv = TimeSeriesSplit(n_splits=5)
+                scores = cross_val_score(model, X, y, cv=tscv, scoring='r2')
                 r2_mean = float(scores.mean())
                 print(f"Linear Regression R2 for Transmission System Demand -> Actual Quantity: {r2_mean:.3f}")
 
@@ -252,7 +255,7 @@ def main():
             return
 
     # Create Linear Regression Model
-    model = linear_regression_model()
+    model = LinearRegressionModel()
      # Add datsets
     results, dfs = model.analyse_historical_data()
     for dataset, result in results.items():

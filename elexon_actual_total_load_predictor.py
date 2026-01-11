@@ -1,8 +1,6 @@
 import requests
 import pandas as pd
-from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import cross_val_score
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import matplotlib.pyplot as plt
@@ -117,6 +115,38 @@ class LoadPredictor:
                 model = RandomForestRegressor(n_estimators=100, random_state=42)
                 model.fit(X_scaled, y)
 
+                # Baseline evaluation on historical sample
+                y_true = y.values
+
+                # persistence baseline: y(t) = lag1
+                y_pred_persist = df['lag1'].values
+
+                def mae(a, b):
+                    # Mean Absolute Error
+                    return float(np.mean(np.abs(a-b)))
+                
+                def rmse(a, b):
+                    # Root Mean Squared Error
+                    return float(np.sqrt(np.mean((a - b) ** 2)))
+                
+                def bias(true, pred):
+                    # Mean Bias Error - average of (pred - true)
+                    return float(np.mean(pred - true))
+                
+                y_pred_model = model.predict(X_scaled)
+
+                self.analysis_results['Baseline Metrics'] = {
+                    "model_mae": mae(y_true, y_pred_model),
+                    "model_rmse": rmse(y_true, y_pred_model),
+                    "model_bias": bias(y_true, y_pred_model),
+
+                    "persistence_mae": mae(y_true, y_pred_persist),
+                    "persistence_rmse": rmse(y_true, y_pred_persist),
+                    "persistence_bias": bias(y_true, y_pred_persist),
+
+                    "n_samples": int(len(df))
+                }
+
                 # Predict next 48 settlement periods
                 predictions = []
                 current_lag = df['quantity'].iloc[-1]  # Last quantity
@@ -132,7 +162,7 @@ class LoadPredictor:
 
                 # Create predictions dataframe
                 last_time = df['startTime'].max()
-                next_times = [last_time + pd.Timedelta(minutes=30 * i) for i in range(1, 49)]
+                next_times = pd.date_range(start=last_time + pd.Timedelta(minutes=30), periods=48, freq="30min")
                 predictions_df = pd.DataFrame({
                     'startTime': next_times,
                     'settlementPeriod': list(range(1, 49)),
@@ -197,7 +227,6 @@ def main():
     results, dfs = predictor.analyse_historical_data()
 
     # Add datsets
-    results, dfs = predictor.analyse_historical_data()
     for dataset, result in results.items():
         print(f"\nAnalysis Results for {dataset}:")
         if isinstance(result, dict):

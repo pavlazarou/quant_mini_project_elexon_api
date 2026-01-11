@@ -9,8 +9,8 @@ class ElexonClient:
         self.base_url = base_url
         # Dictionary of datasets to track
         self.datasets = {
-            "Demand Forecast (Day-ahead)" :"forecast/demand/day-ahead/?format=json", 
-            "Indicated Forecast (Day-ahead)" :"forecast/indicated/day-ahead/?format=json"
+            "Demand Forecast (Day-ahead)" :"forecast/demand/day-ahead?format=json", 
+            "Indicated Forecast (Day-ahead)" :"forecast/indicated/day-ahead?format=json"
             }
         self.headers = {"accept": "application/json"} 
 
@@ -73,7 +73,7 @@ class StatisticalAnalysis:
                     df['transmissionSystemDemand'] = pd.to_numeric(df['transmissionSystemDemand'], errors='coerce')
                     df['nationalDemand'] = pd.to_numeric(df['nationalDemand'], errors='coerce')
 
-                    # Calculate moving averages (48-hour window assuming hourly data)
+                    # Calculate moving averages (24-hour window)
                     df['transmissionSystemDemand_MA'] = df['transmissionSystemDemand'].rolling(window=24).mean()
                     df['nationalDemand_MA'] = df['nationalDemand'].rolling(window=24).mean()
 
