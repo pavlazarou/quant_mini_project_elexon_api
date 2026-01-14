@@ -5,26 +5,39 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 import matplotlib.pyplot as plt
 
+# Default dates: Looking at historical data from a specific week
+historical_dates_from = "from=2025-12-10"
+historical_dates_to = "to=2025-12-17"
+#Default: Looking at settlement periods for the whole day
+settlement_periods_from = "fromSettlementPeriod=1"
+settlement_periods_to = "toSettlementPeriod=48"    
+
+
 class ElexonClient:
-    def __init__(self, base_url="https://data.elexon.co.uk/bmrs/api/v1"):
+    def __init__(self, base_url="https://data.elexon.co.uk/bmrs/api/v1", historical_dates_from=historical_dates_from, historical_dates_to=historical_dates_to, settlement_periods_from=settlement_periods_from, settlement_periods_to=settlement_periods_to):
         self.base_url = base_url
+        self.historical_dates_from = historical_dates_from
+        self.historical_dates_to = historical_dates_to
+        self.settlement_periods_from = settlement_periods_from
+        self.settlement_periods_to = settlement_periods_to
         # Dictionary of datasets to track
         self.datasets = {
             "Actual Total Load": "demand/actual/total",
             }
-        # Looking at historical data from a specific week
-        self.historical_dates_from = "from=2025-12-10"
-        self.historical_dates_to = "to=2025-12-17"
-        # Looking at settlement periods for the whole day
-        self.settlement_periods_from = "fromSettlementPeriod=1"
-        self.settlement_periods_to = "toSettlementPeriod=48"    
         self.headers = {"accept": "application/json"} 
-
         print("[Elexon] Client initialised")
 
-    def test_connection(self, endpoint):
+    def test_connection(self, endpoint, historical_dates_from=None, historical_dates_to=None, settlement_periods_from=None, settlement_periods_to=None):
+        if historical_dates_from is None:
+            historical_dates_from = self.historical_dates_from
+        if historical_dates_to is None:
+            historical_dates_to = self.historical_dates_to
+        if settlement_periods_from is None:
+            settlement_periods_from = self.settlement_periods_from
+        if settlement_periods_to is None:
+            settlement_periods_to = self.settlement_periods_to
 
-        url = f"{self.base_url}/{endpoint}?{self.historical_dates_from}&{self.historical_dates_to}&{self.settlement_periods_from}&{self.settlement_periods_to}"
+        url = f"{self.base_url}/{endpoint}?{historical_dates_from}&{historical_dates_to}&{settlement_periods_from}&{settlement_periods_to}"
 
         try:
             response = requests.get(url, headers=self.headers, timeout=5)
@@ -39,10 +52,18 @@ class ElexonClient:
             return False
 
 
-    def fetch_historical_data(self, endpoint):
+    def fetch_historical_data(self, endpoint, historical_dates_from=None, historical_dates_to=None, settlement_periods_from=None, settlement_periods_to=None):
         """Fetch historical data for a given endpoint from Elexon API"""
+        if historical_dates_from is None:
+            historical_dates_from = self.historical_dates_from
+        if historical_dates_to is None:
+            historical_dates_to = self.historical_dates_to
+        if settlement_periods_from is None:
+            settlement_periods_from = self.settlement_periods_from
+        if settlement_periods_to is None:
+            settlement_periods_to = self.settlement_periods_to
 
-        url = f"{self.base_url}/{endpoint}?{self.historical_dates_from}&{self.historical_dates_to}&{self.settlement_periods_from}&{self.settlement_periods_to}"
+        url = f"{self.base_url}/{endpoint}?{historical_dates_from}&{historical_dates_to}&{settlement_periods_from}&{settlement_periods_to}"
 
         try:
             response = requests.get(url,headers=self.headers, timeout=5)
@@ -61,11 +82,11 @@ class LoadPredictor:
         self.dataframes = {}
         self.client = ElexonClient()
 
-    def analyse_historical_data(self):
+    def analyse_historical_data(self, historical_dates_from=historical_dates_from, historical_dates_to=historical_dates_to, settlement_periods_from=settlement_periods_from, settlement_periods_to=settlement_periods_to):
         """Fetch data and perform analysis"""
 
         for dataset_name, endpoint in self.client.datasets.items():
-            data = self.client.fetch_historical_data(endpoint)
+            data = self.client.fetch_historical_data(endpoint, historical_dates_from, historical_dates_to, settlement_periods_from, settlement_periods_to)
 
             if data and 'data' in data:
                 df = pd.DataFrame(data['data'])
@@ -208,7 +229,7 @@ class LoadPredictor:
         plt.grid(True)
         plt.show()
 
-def main():
+def main(historical_dates_from=historical_dates_from, historical_dates_to=historical_dates_to, settlement_periods_from=settlement_periods_from, settlement_periods_to=settlement_periods_to):
     print("\n" + "="*80)
     print("ACTUAL LOAD PREDICTOR")
     print("="*80)
@@ -218,13 +239,13 @@ def main():
 
     # Test connection for each dataset
     for dataset_name, endpoint in elexon.datasets.items():
-        if not elexon.test_connection(endpoint):
+        if not elexon.test_connection(endpoint, historical_dates_from=historical_dates_from, historical_dates_to=historical_dates_to, settlement_periods_from=settlement_periods_from, settlement_periods_to=settlement_periods_to):
             print(f"[Main] Failed to connect to Elexon for {dataset_name}. Check Inputs.")
             return
 
     # Create Load Predictor
     predictor = LoadPredictor()
-    results, dfs = predictor.analyse_historical_data()
+    results, dfs = predictor.analyse_historical_data(historical_dates_from=historical_dates_from, historical_dates_to=historical_dates_to, settlement_periods_from=settlement_periods_from, settlement_periods_to=settlement_periods_to)
 
     # Add datsets
     for dataset, result in results.items():
@@ -246,4 +267,4 @@ def main():
     print("[Main] Total Load Prediction Complete!")
 
 if __name__ == "__main__":
-    main()
+    main(historical_dates_from="from=2026-01-01", historical_dates_to="to=2026-01-07", settlement_periods_from="fromSettlementPeriod=1", settlement_periods_to="toSettlementPeriod=48")

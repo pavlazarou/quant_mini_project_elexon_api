@@ -5,30 +5,45 @@ from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 import numpy as np
 import matplotlib.pyplot as plt
 
+# Default dates: Looking at historical data from a specific week
+historical_dates_from = "from=2025-12-10"
+historical_dates_to = "to=2025-12-17"
+#Default: Looking at settlement periods for the whole day
+settlement_periods_from = "fromSettlementPeriod=1"
+settlement_periods_to = "toSettlementPeriod=48"    
+
 class ElexonClient:
-    def __init__(self, base_url="https://data.elexon.co.uk/bmrs/api/v1"):
-        self.base_url = base_url
+    def __init__(self, base_url="https://data.elexon.co.uk/bmrs/api/v1", historical_dates_from=historical_dates_from, historical_dates_to=historical_dates_to, settlement_periods_from=settlement_periods_from, settlement_periods_to=settlement_periods_to):
+        """Initialise Elexon API Client"""
+        self.base_url = base_url        # Default parameters for historical data fetching
+        self.historical_dates_from = historical_dates_from      # Default: Looking at historical data from a specific week
+        self.historical_dates_to = historical_dates_to      # Default: Looking at historical data to a specific week
+        self.settlement_periods_from = settlement_periods_from      # Default: Looking at settlement periods for the whole day
+        self.settlement_periods_to = settlement_periods_to          # Default: Looking at settlement periods for the whole day
         # Dictionary of datasets to track
         self.datasets = {
-            "Historical Latest Demand Forecast (Day-ahead)" :"forecast/demand/day-ahead/latest",
-            "Actual Total Load": "demand/actual/total",
-            }
-        # Looking at historical data from a specific week
-        self.historical_dates_from = "from=2025-11-01"
-        self.historical_dates_to = "to=2025-11-07"
-        # Looking at settlement periods for the whole day
-        self.settlement_periods_from = "fromSettlementPeriod=1"
-        self.settlement_periods_to = "toSettlementPeriod=48"    
+            "Historical Latest Demand Forecast (Day-ahead)" :"forecast/demand/day-ahead/latest",        # Endpoint for day-ahead demand forecast
+            "Actual Total Load": "demand/actual/total"                      # Endpoint for actual total load
+        }
         self.headers = {"accept": "application/json"} 
 
         print("[Elexon] Client initialised")
 
-    def test_connection(self, endpoint):
+    def test_connection(self, endpoint, historical_dates_from=None, historical_dates_to=None, settlement_periods_from=None, settlement_periods_to=None):
+        """Test connection to a given endpoint from Elexon API"""
+        if historical_dates_from is None:
+            historical_dates_from = self.historical_dates_from
+        if historical_dates_to is None:
+            historical_dates_to = self.historical_dates_to
+        if settlement_periods_from is None:
+            settlement_periods_from = self.settlement_periods_from
+        if settlement_periods_to is None:
+            settlement_periods_to = self.settlement_periods_to
 
-        url = f"{self.base_url}/{endpoint}?{self.historical_dates_from}&{self.historical_dates_to}&{self.settlement_periods_from}&{self.settlement_periods_to}"
+        url = f"{self.base_url}/{endpoint}?{historical_dates_from}&{historical_dates_to}&{settlement_periods_from}&{settlement_periods_to}"
 
         try:
-            response = requests.get(url, headers=self.headers, timeout=5)
+            response = requests.get(url, headers=self.headers, timeout=5)  
             if response.status_code == 200:
                 print("[Elexon] Connection Successful!")
                 return True
@@ -40,10 +55,19 @@ class ElexonClient:
             return False
 
 
-    def fetch_historical_data(self, endpoint):
+    def fetch_historical_data(self, endpoint, historical_dates_from=None, historical_dates_to=None, settlement_periods_from=None, settlement_periods_to=None):
         """Fetch historical data for a given endpoint from Elexon API"""
 
-        url = f"{self.base_url}/{endpoint}?{self.historical_dates_from}&{self.historical_dates_to}&{self.settlement_periods_from}&{self.settlement_periods_to}"
+        if historical_dates_from is None:
+            historical_dates_from = self.historical_dates_from
+        if historical_dates_to is None:
+            historical_dates_to = self.historical_dates_to
+        if settlement_periods_from is None:
+            settlement_periods_from = self.settlement_periods_from
+        if settlement_periods_to is None:
+            settlement_periods_to = self.settlement_periods_to
+
+        url = f"{self.base_url}/{endpoint}?{historical_dates_from}&{historical_dates_to}&{settlement_periods_from}&{settlement_periods_to}"
 
         try:
             response = requests.get(url,headers=self.headers, timeout=5)
@@ -58,23 +82,23 @@ class ElexonClient:
         
 class LinearRegressionModel:
     def __init__(self):
+        """Initialise Linear Regression Model for Elexon Data Analysis"""
         self.client = ElexonClient()
         self.analysis_results = {}
         self.dataframes = {}
 
-    def analyse_historical_data(self):
+    def analyse_historical_data(self, historical_dates_from=historical_dates_from, historical_dates_to=historical_dates_to, settlement_periods_from=settlement_periods_from, settlement_periods_to=settlement_periods_to):
         """Fetch historical data for all endpoints and perform Linear Regression"""
 
-        for dataset_name, endpoint in self.client.datasets.items():
-            data = self.client.fetch_historical_data(endpoint)
-
+        for dataset_name, endpoint in self.client.datasets.items():     
+            data = self.client.fetch_historical_data(endpoint, historical_dates_from, historical_dates_to, settlement_periods_from, settlement_periods_to)      
             if data and 'data' in data:
-                df = pd.DataFrame(data['data'])
+                df = pd.DataFrame(data['data'])         # Create DataFrame from fetched data
 
                 # Convert startTime to datetime if it exists
                 if 'startTime' in df.columns:
-                    df['startTime'] = pd.to_datetime(df['startTime'], utc=True, errors='coerce')
-                    df = df.sort_values('startTime')
+                    df['startTime'] = pd.to_datetime(df['startTime'], utc=True, errors='coerce')        
+                    df = df.sort_values('startTime')        
                 
                 #Convert relevant columns to numeric, errors='coerce' will turn non-numeric to NaN
                 if dataset_name == "Historical Latest Demand Forecast (Day-ahead)":
@@ -82,7 +106,7 @@ class LinearRegressionModel:
                     df['settlementPeriod'] = pd.to_numeric(df['settlementPeriod'], errors='coerce')
 
                     df = df.dropna()
-
+                    # Basic statistics
                     self.analysis_results[dataset_name] = {
                         'transmissionSystemDemand_mean': df['transmissionSystemDemand'].mean(),
                         'transmissionSystemDemand_std': df['transmissionSystemDemand'].std(),
@@ -93,7 +117,7 @@ class LinearRegressionModel:
                     df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
 
                     df = df.dropna()
-
+                    # Basic statistics
                     self.analysis_results[dataset_name] = {
                         'quantity_mean': df['quantity'].mean(),
                         'quantity_std': df['quantity'].std(),
@@ -110,13 +134,13 @@ class LinearRegressionModel:
             df_demand = self.dataframes["Historical Latest Demand Forecast (Day-ahead)"]
             df_actual = self.dataframes["Actual Total Load"]
 
-            join_keys = []
+            join_keys = []     
             if "settlementDate" in df_demand.columns and "settlementDate" in df_actual.columns:
                 join_keys = ["settlementDate", "settlementPeriod"]
             elif "startTime" in df_demand.columns and "startTime" in df_actual.columns:
                 join_keys = ["startTime", "settlementPeriod"]
             else:
-                raise ValueError("No reliable join keys found (need settlementDate or startTime plus settlementPeriod).")
+                raise ValueError("No reliable join keys found (need settlementDate or startTime plus settlementPeriod).")      
 
             # Merge on settlementPeriod
             df_merged = pd.merge(df_demand, df_actual, on=join_keys, how='inner', suffixes=('_demand', '_actual'))
@@ -126,7 +150,7 @@ class LinearRegressionModel:
             if not df_merged.empty:
                 df_merged["spread"] = df_merged["quantity"] - df_merged["transmissionSystemDemand"] 
                 df_merged["abs_spread"] = df_merged["spread"].abs()
-
+                # Spread analysis
                 self.analysis_results["Spread Analysis"] = {
                     "mean_spread": float(df_merged["spread"].mean()),
                     "std_spread": float(df_merged["spread"].std()),
@@ -137,7 +161,7 @@ class LinearRegressionModel:
                     "mean_abs_spread": float(df_merged["abs_spread"].mean()),
                     "n_samples": int(len(df_merged))
                 }
-
+                # Linear Regression
                 X = df_merged[['transmissionSystemDemand']]
                 y = df_merged['quantity']
 
@@ -145,13 +169,13 @@ class LinearRegressionModel:
                 model.fit(X, y)
                 slopes = model.coef_[0]
                 intercept = model.intercept_
-                tscv = TimeSeriesSplit(n_splits=5)
+                tscv = TimeSeriesSplit(n_splits=5)      # Time series cross-validation - training on past, testing on future
                 scores = cross_val_score(model, X, y, cv=tscv, scoring='r2')
                 r2_mean = float(scores.mean())
                 print(f"Linear Regression R2 for Transmission System Demand -> Actual Quantity: {r2_mean:.3f}")
-
+                # Interpret R^2
                 relationship_commentary = self.interpret_relationship(r2_mean)
-
+                # Store results
                 self.analysis_results['Relationship Analysis'] = {
                     'slope': float(slopes),
                     'intercept': float(intercept),
@@ -212,7 +236,7 @@ class LinearRegressionModel:
 
             # Histogram
             ax1 = fig.add_subplot(gs[1, 0])
-
+            # Overall title
             fig.suptitle('Transmission System Demand vs Actual Quantity Analysis', fontsize=16)
             
             # Plot scatter plot
@@ -222,7 +246,7 @@ class LinearRegressionModel:
             ax0.set_title('Scatter Plot: Transmission System Demand vs Actual Quantity')
             # Add regression line
             if 'Relationship Analysis' in results and isinstance(results['Relationship Analysis'], dict):
-                slope = results['Relationship Analysis']['slope']
+                slope = results['Relationship Analysis']['slope']       
                 intercept = results['Relationship Analysis']['intercept']
                 x_vals = np.linspace(df['transmissionSystemDemand'].min(), df['transmissionSystemDemand'].max(), 100)
                 y_vals = slope * x_vals + intercept
@@ -240,7 +264,7 @@ class LinearRegressionModel:
             ax1.grid(True)
         plt.show()
 
-def main():
+def main(historical_dates_from=historical_dates_from, historical_dates_to=historical_dates_to, settlement_periods_from=settlement_periods_from, settlement_periods_to=settlement_periods_to):
     print("\n" + "="*80)
     print("ELEXON LINEAR REGRESSION ANALYSIS")
     print("="*80)
@@ -250,7 +274,7 @@ def main():
 
     # Test connection for each dataset
     for dataset_name, endpoint in elexon.datasets.items():
-        if not elexon.test_connection(endpoint):
+        if not elexon.test_connection(endpoint, historical_dates_from=historical_dates_from, historical_dates_to=historical_dates_to, settlement_periods_from=settlement_periods_from, settlement_periods_to=settlement_periods_to):
             print(f"[Main] Failed to connect to Elexon for {dataset_name}. Check Inputs.")
             return
 
@@ -276,4 +300,4 @@ def main():
     model.plot_relationship(results, dfs)
 
 if __name__ == "__main__":
-    main()
+    main(historical_dates_from="from=2026-01-01", historical_dates_to="to=2026-01-07", settlement_periods_from="fromSettlementPeriod=1", settlement_periods_to="toSettlementPeriod=48")
