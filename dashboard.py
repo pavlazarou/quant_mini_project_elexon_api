@@ -30,26 +30,26 @@ st.set_page_config(
 # Custom CSS for better styling - this will be minimal for clarity. I have added some basic styles such as headers and metric cards.
 st.markdown("""
 <style>
-    .main-header {
+    .main-header{
         font-size: 2.5rem;
         font-weight: bold;
         color: #1E3A5F;
         text-align: center;
         margin-bottom: 0.5rem;
     }
-    . sub-header {
+    .sub-header{
         font-size: 1.2rem;
         color: #666;
         text-align: center;
         margin-bottom: 2rem;
     }
-    .metric-card {
+    .metric-card{
         background-color: #f0f2f6;
         border-radius: 10px;
         padding: 20px;
         margin:  10px 0;
     }
-    .stMetric {
+    .stMetric{
         background-color: #ffffff;
         border-radius: 10px;
         padding:  15px;
@@ -65,7 +65,7 @@ class ElexonAPIClient:
     def __init__(self):
         self.base_url = "https://data.elexon.co.uk/bmrs/api/v1"
         self.headers = {"accept": "application/json"}
-        print("[ELEXON] Initialised Elexon API Client")
+        st.caption("[ELEXON] Initialised Elexon API Client")
 
     def fetch_actual_load(self, date_from, date_to, sp_from=1, sp_to=48):
         """Fetch actual total load data"""
@@ -162,7 +162,7 @@ def process_actual_load_data(data):
         return None
 
     if 'startTime' in df.columns:
-        df['startTime'] = pd.to_datetime(df['startTime']).dt.tz_localize(None)
+        df['startTime'] = pd.to_datetime(df['startTime'], utc=True, errors='coerce').dt.tz_convert(None)
         df = df.sort_values('startTime')
 
     df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
@@ -182,7 +182,7 @@ def process_forecast_data(data):
         return None
 
     if 'startTime' in df.columns:
-        df['startTime'] = pd.to_datetime(df['startTime']).dt.tz_localize(None)
+        df['startTime'] = pd.to_datetime(df['startTime'], utc=True, errors='coerce').dt.tz_convert(None)
         df = df.sort_values('startTime')
 
     df['transmissionSystemDemand'] = pd.to_numeric(df['transmissionSystemDemand'], errors='coerce')
@@ -211,7 +211,7 @@ def process_indicated_forecast(data):
         return None
 
     if 'startTime' in df.columns:
-        df['startTime'] = pd.to_datetime(df['startTime']).dt.tz_localize(None)
+        df['startTime'] = pd.to_datetime(df['startTime'], utc=True, errors='coerce').dt.tz_convert(None)
         df = df. sort_values('startTime')
 
     df['indicatedGeneration'] = pd. to_numeric(df['indicatedGeneration'], errors='coerce')
@@ -315,6 +315,7 @@ def run_linear_regression(df_forecast, df_actual):
         suffixes=('_forecast', '_actual')
     )
     df_merged = df_merged.dropna(subset=["transmissionSystemDemand", "quantity"])
+    df_merged = df_merged.sort_values(["startTime", "settlementPeriod"]).reset_index(drop=True)
 
     if df_merged.empty:
         st.warning("No matching data points found between forecast and actual data")
@@ -843,9 +844,9 @@ def main():
     st.markdown("---")
     st.markdown(
         """
-        <div style='text-align: centre; color: #666;'>
+        <div style='text-align: center; color: #666;'>
             <p><strong>Developed by Pavlos Lazarou for Welsh Power Graduate Quantitative Trading Analyst Application</strong></p>
-            <p>Data source: <a href="https://www.elexon.co. uk/data/balancing-mechanism-reporting-agent-bmra/" target="_blank">Elexon BMRS</a></p>
+            <p>Data source: <a href="https://www.elexon.co.uk/data/balancing-mechanism-reporting-agent-bmra/" target="_blank">Elexon BMRS</a></p>
         </div>
         """,
         unsafe_allow_html=True
