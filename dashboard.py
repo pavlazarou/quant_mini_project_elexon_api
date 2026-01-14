@@ -193,10 +193,10 @@ def process_forecast_data(data):
 
     df = df.dropna(subset=['transmissionSystemDemand', 'settlementPeriod'])
 
-    # Calculate moving averages
-    df['transmissionSystemDemand_MA'] = df['transmissionSystemDemand'].rolling(window=24, min_periods=1).mean()
+    # Calculate moving averages - 4-hour moving average (8 periods of 30 mins)
+    df['transmissionSystemDemand_MA'] = df['transmissionSystemDemand'].rolling(window=8, min_periods=1).mean()
     if 'nationalDemand' in df.columns:
-        df['nationalDemand_MA'] = df['nationalDemand']. rolling(window=24, min_periods=1).mean()
+        df['nationalDemand_MA'] = df['nationalDemand']. rolling(window=8, min_periods=1).mean()
 
     return df
 
@@ -217,9 +217,9 @@ def process_indicated_forecast(data):
     df['indicatedGeneration'] = pd. to_numeric(df['indicatedGeneration'], errors='coerce')
     df['indicatedDemand'] = pd.to_numeric(df['indicatedDemand'], errors='coerce')
 
-    # Calculate moving averages
-    df['indicatedGeneration_MA'] = df['indicatedGeneration'].rolling(window=24, min_periods=1).mean()
-    df['indicatedDemand_MA'] = df['indicatedDemand']. rolling(window=24, min_periods=1).mean()
+    # Calculate moving averages - 8-hour moving average (16 periods of 30 mins)
+    df['indicatedGeneration_MA'] = df['indicatedGeneration'].rolling(window=16, min_periods=1).mean()
+    df['indicatedDemand_MA'] = df['indicatedDemand']. rolling(window=16, min_periods=1).mean()
 
     return df
 
@@ -727,7 +727,22 @@ def main():
             )
             st.plotly_chart(fig_hourly, use_container_width=True)
 
-            # Today's forecasts (like your statistical_analysis.py)
+            # Time series view
+            st.subheader("📈 Load Profile Over Time")
+            fig_time = px.line(
+                df_actual,
+                x='startTime',
+                y='quantity',
+                title="Actual Total Load Time Series"
+            )
+            fig_time.update_layout(
+                xaxis_title="Time",
+                yaxis_title="Quantity (MW)",
+                height=400
+            )
+            st.plotly_chart(fig_time, use_container_width=True)
+
+            # Today's forecasts (like statistical_analysis.py)
             if df_demand_today is not None or df_indicated_today is not None: 
                 st.subheader("📅 Today's Forecasts")
 
@@ -746,7 +761,7 @@ def main():
 
                         fig.add_trace(
                             go.Scatter(x=df_demand_today['startTime'], y=df_demand_today['transmissionSystemDemand_MA'],
-                                      mode='lines', name='Transmission System Demand MA (24h)', line=dict(color='blue', width=2, dash='dash')),
+                                      mode='lines', name='Transmission System Demand MA (8h)', line=dict(color='blue', width=2, dash='dash')),
                             row=1, col=1
                         )
                     if 'nationalDemand' in df_demand_today.columns:
@@ -757,7 +772,7 @@ def main():
                         )
                         fig.add_trace(
                             go.Scatter(x=df_demand_today['startTime'], y=df_demand_today['nationalDemand_MA'],
-                                      mode='lines', name='National Demand MA (24h)', line=dict(color='green', width=2, dash='dash')),
+                                      mode='lines', name='National Demand MA (8h)', line=dict(color='green', width=2, dash='dash')),
                             row=1, col=1
                         )
 
@@ -770,7 +785,7 @@ def main():
                         )
                         fig.add_trace(
                             go.Scatter(x=df_indicated_today['startTime'], y=df_indicated_today['indicatedGeneration_MA'],
-                                      mode='lines', name='Indicated Generation MA (24h)', line=dict(color='red', width=2, dash='dash')),
+                                      mode='lines', name='Indicated Generation MA (8h)', line=dict(color='red', width=2, dash='dash')),
                             row=2, col=1
                         )
                     if 'indicatedDemand' in df_indicated_today.columns:
@@ -781,7 +796,7 @@ def main():
                         )
                         fig.add_trace(
                             go.Scatter(x=df_indicated_today['startTime'], y=df_indicated_today['indicatedDemand_MA'],
-                                      mode='lines', name='Indicated Demand MA (24h)', line=dict(color='orange', width=2, dash='dash')),
+                                      mode='lines', name='Indicated Demand MA (8h)', line=dict(color='orange', width=2, dash='dash')),
                             row=2, col=1
                         )
 
@@ -793,20 +808,6 @@ def main():
 
                     st.plotly_chart(fig, use_container_width=True)
 
-            # Time series view
-            st.subheader("📈 Load Profile Over Time")
-            fig_time = px.line(
-                df_actual,
-                x='startTime',
-                y='quantity',
-                title="Actual Total Load Time Series"
-            )
-            fig_time.update_layout(
-                xaxis_title="Time",
-                yaxis_title="Quantity (MW)",
-                height=400
-            )
-            st.plotly_chart(fig_time, use_container_width=True)
 
     else:
         # Welcome message when no data is loaded
@@ -846,7 +847,7 @@ def main():
         """
         <div style='text-align: center; color: #666;'>
             <p><strong>Developed by Pavlos Lazarou for Welsh Power Graduate Quantitative Trading Analyst Application</strong></p>
-            <p>Data source: <a href="https://www.elexon.co.uk/data/balancing-mechanism-reporting-agent-bmra/" target="_blank">Elexon BMRS</a></p>
+            <p>Data source: <a href="https://bmrs.elexon.co.uk/" target="_blank">Elexon BMRS</a></p>
         </div>
         """,
         unsafe_allow_html=True

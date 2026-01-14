@@ -1,0 +1,238 @@
+# Elexon BMRS Analysis Dashboard - Presentation Script
+
+## For Welsh Power Graduate Quantitative Trading Analyst Interview
+
+---
+
+## 🎯 Introduction (1-2 minutes)
+
+> "Good morning/afternoon. Thank you for the opportunity to present my mini project. 
+>
+> Today I'll be demonstrating an interactive dashboard I built to analyse UK energy market data using the **Elexon BMRS API**. This project showcases the key skills mentioned in the job description:  **data and API management**, **statistical analysis**, and the ability to **effectively develop and present insights**.
+>
+> The dashboard consolidates three separate analysis scripts I developed into a single, user-friendly interface that allows for dynamic exploration of energy market data."
+
+---
+
+## 📊 Dashboard Overview (2-3 minutes)
+
+### Opening the Dashboard
+
+> "Let me walk you through the dashboard.  On the left, you'll see the **configuration panel** where users can: 
+>
+> - Select a **date range** (up to 7 days, which is the Elexon API limit)
+> - Choose specific **settlement periods** (each representing a 30-minute interval)
+> - Select the type of **analysis** they want to perform
+>
+> The dashboard fetches **real-time data** from the Elexon BMRS API, so we're always working with the latest available information."
+
+### Demonstrate the Controls
+
+1. **Adjust the date range** - Show how the validation prevents selecting more than 7 days
+2. **Adjust settlement periods** - Explain that periods 1-48 cover a full day (48 × 30 minutes = 24 hours)
+3. **Click "Fetch Data & Analyse"** - Show the loading spinner and success messages
+
+---
+
+## 📈 Analysis 1: Load Prediction (3-4 minutes)
+
+> "The first analysis uses a **Random Forest Regression model** to predict electricity demand for the next 48 settlement periods—that's the next 24 hours. 
+>
+> This is directly relevant to Welsh Power's trading operations, where accurate demand forecasting helps optimise when to dispatch flexible generation assets."
+
+### Key Points to Highlight:
+
+| Metric | What It Shows |
+|--------|---------------|
+| **Model MAE** | Average prediction error in MW - lower is better |
+| **Model RMSE** | Penalises larger errors more heavily |
+| **Persistence MAE** | Baseline comparison (naïve "tomorrow = today" forecast) |
+| **Improvement vs Baseline** | How much better our model performs |
+
+> "As you can see, the Random Forest model achieves a **[X]% improvement** over the simple persistence baseline.  This demonstrates that the model is capturing meaningful patterns in the data. 
+>
+> The **feature importance chart** shows that the **Lag-1 Quantity** (the previous period's demand) is the strongest predictor, which makes intuitive sense—demand tends to be autocorrelated. 
+>
+> The **time series plot** shows the actual historical load in blue, with our predictions for the next 24 hours shown as an orange dashed line."
+
+### Technical Discussion Points:
+
+- **Why Random Forest?** - Handles non-linear relationships, robust to overfitting, provides feature importance
+- **Why StandardScaler?** - Normalises features for better model performance
+- **Why lag features?** - Captures temporal autocorrelation in demand data
+
+---
+
+## 🔗 Analysis 2: Regression Analysis (3-4 minutes)
+
+> "The second analysis examines the **relationship between day-ahead demand forecasts and actual realised load**. This is crucial for understanding forecast accuracy and potential trading opportunities.
+>
+> In energy trading, the spread between forecast and actual demand creates opportunities—if you can predict when forecasts will be wrong, you can position accordingly."
+
+### Key Points to Highlight: 
+
+| Metric | What It Shows |
+|--------|---------------|
+| **R² Score** | How much variance in actual load is explained by the forecast |
+| **Slope** | Should be close to 1.0 for a perfect forecast |
+| **Intercept** | Systematic bias in the forecast |
+| **Mean Spread** | Average forecast error (positive = under-forecast) |
+
+> "The **R² score of [X]** indicates a [strong/moderate/weak] relationship between forecast and actual demand. The interpretation box explains what this means in practical terms. 
+>
+> Looking at the **scatter plot**, you can see how closely the data points follow the regression line. A perfect forecast would show all points on the diagonal. 
+>
+> The **histogram of forecast errors** shows the distribution of spreads.  A well-calibrated forecast would be centred around zero with minimal spread."
+
+### Technical Discussion Points: 
+
+- **Time Series Cross-Validation** - Used `TimeSeriesSplit` to avoid look-ahead bias
+- **Spread Analysis** - 5th and 95th percentiles show the range of typical forecast errors
+- **Trading Implications** - Large spreads indicate potential trading opportunities
+
+---
+
+## 📊 Analysis 3: Statistical Overview (2-3 minutes)
+
+> "The third analysis provides a **statistical summary** of the data, including today's live forecasts from Elexon. 
+>
+> This gives traders a quick snapshot of current market conditions and expected demand patterns."
+
+### Key Points to Highlight: 
+
+1. **Descriptive Statistics** - Mean, standard deviation, min/max demand
+2. **Load Distribution** - Box plot showing the spread of demand values
+3. **Settlement Period Profile** - Shows the typical daily demand curve
+4. **Today's Forecasts** - Live data showing expected demand and generation
+
+> "The **settlement period chart** is particularly useful—it shows the typical demand profile throughout the day. You can clearly see the morning ramp-up, the midday plateau, the evening peak, and the overnight trough.
+>
+> This pattern is important for scheduling flexible generation assets like those Welsh Power operates."
+
+---
+
+## 💡 Technical Highlights (2-3 minutes)
+
+> "Let me highlight some of the technical decisions I made in building this dashboard:"
+
+### API Integration
+
+> "The Elexon BMRS API provides open-source energy market data. I built a dedicated **API client class** that:
+> - Handles connection errors and timeouts gracefully
+> - Validates date ranges (max 7 days)
+> - Filters data by settlement period client-side for flexibility"
+
+### Data Processing
+
+> "The data processing pipeline: 
+> - Converts timestamps and handles timezone issues
+> - Coerces data types and handles missing values
+> - Calculates derived features like moving averages and spreads"
+
+### Visualisation
+
+> "I chose **Plotly** for visualisation because it provides:
+> - Interactive charts (zoom, pan, hover for details)
+> - Professional appearance suitable for stakeholder presentations
+> - Consistency across all chart types"
+
+### Framework Choice
+
+> "**Streamlit** was chosen because it:
+> - Enables rapid prototyping of data applications
+> - Provides a clean, professional interface
+> - Integrates seamlessly with Python data science libraries"
+
+---
+
+## 🔄 Live Demonstration (2-3 minutes)
+
+> "Let me demonstrate the dashboard's flexibility with a few scenarios:"
+
+### Scenario 1: Different Date Range
+
+> "If I change the date range to [new dates], you'll see the analysis updates automatically with fresh data from the API."
+
+### Scenario 2: Specific Settlement Periods
+
+> "If I'm only interested in peak demand periods, I can filter to settlement periods 32-40 (roughly 4pm-8pm). Watch how all the analyses update to focus on this period."
+
+### Scenario 3: All Analyses View
+
+> "Selecting 'All Analyses' gives a comprehensive view—useful for a daily morning briefing or preparing for a trading session."
+
+---
+
+## 📝 Summary & Relevance to Welsh Power (2 minutes)
+
+> "To summarise, this dashboard demonstrates: 
+>
+> 1. **Data & API Management** - Real-time integration with Elexon BMRS API
+> 2. **Statistical Analysis** - Regression modelling, spread analysis, descriptive statistics
+> 3. **Machine Learning** - Random Forest prediction with proper validation
+> 4. **Insight Presentation** - Interactive visualisations with clear interpretations
+>
+> These skills directly align with the role requirements: 
+>
+> - **Building quantitative models** - The load prediction model forecasts demand
+> - **Developing data from APIs** - The Elexon API integration demonstrates this
+> - **Providing insight and analysis** - The regression and statistical analyses inform trading decisions
+> - **Supporting algorithmic trading** - This dashboard could be extended to generate trading signals
+>
+> I'm excited about the opportunity to apply these skills at Welsh Power, particularly in optimising flexible generation assets and developing trading strategies for the short-term power markets."
+
+---
+
+## ❓ Anticipated Questions & Answers
+
+### Q: Why did you choose Random Forest over other models? 
+
+> "Random Forest was chosen because it: 
+> - Handles non-linear relationships well
+> - Is robust to overfitting with proper hyperparameters
+> - Provides interpretable feature importance
+> - Requires minimal hyperparameter tuning for reasonable performance
+>
+> For production, I would also test gradient boosting methods (XGBoost, LightGBM) and potentially LSTM networks for longer-term forecasting."
+
+### Q: How would you improve the prediction model?
+
+> "Several improvements are possible:
+> - **Additional features**:  Weather data (temperature, wind), calendar features (weekday/weekend, holidays), lagged prices
+> - **Ensemble methods**: Combine multiple models for more robust predictions
+> - **Hyperparameter tuning**: Use cross-validation to optimise model parameters
+> - **Real-time updates**: Implement streaming data for live predictions"
+
+### Q: How would this integrate with a trading system?
+
+> "This dashboard could be extended to:
+> - Generate buy/sell signals based on forecast spreads
+> - Calculate optimal dispatch schedules for flexible assets
+> - Provide risk metrics for position sizing
+> - Integrate with order management systems via API"
+
+### Q: What are the limitations of this analysis?
+
+> "Key limitations include:
+> - **7-day data window**:  Elexon API limit restricts historical analysis
+> - **Simple features**: More sophisticated feature engineering would improve predictions
+> - **No weather data**: Temperature is a key driver of demand
+> - **Point forecasts only**: Probabilistic forecasts would be more useful for risk management"
+
+### Q: How did you validate the model?
+
+> "I used several validation approaches:
+> - **Persistence baseline**:  Comparing against a naïve 'tomorrow = today' forecast
+> - **Time series cross-validation**:  Using `TimeSeriesSplit` to avoid look-ahead bias
+> - **Multiple metrics**: MAE, RMSE, and bias to capture different error characteristics"
+
+---
+
+## 🚀 How to Run the Dashboard
+
+```bash
+# Install dependencies
+pip install streamlit pandas numpy scikit-learn plotly requests
+
+# Run the dashboard
+streamlit run streamlit_app.py
