@@ -574,25 +574,13 @@ def main():
 
                 st.plotly_chart(fig, use_container_width=True)
 
-                # Feature importance and predictions table
-                col1, col2 = st.columns([1, 2])
-                with col1:
-                    st.subheader("Feature Importance")
-                    fi_df = pd.DataFrame({
-                        'Feature': ['Settlement Period', 'Lag-1 Quantity'],
-                        'Importance': feature_importance
-                    }).sort_values('Importance', ascending=True)
-                    fig_fi = px.bar(fi_df, x='Importance', y='Feature', orientation='h',
-                                   color='Importance', color_continuous_scale='Blues')
-                    fig_fi.update_layout(height=200, showlegend=False)
-                    st.plotly_chart(fig_fi, use_container_width=True)
-
-                with col2:
-                    st.subheader("Predicted Values (Next 48 Periods)")
-                    display_df = predictions_df[['startTime', 'settlementPeriod', 'quantity']].copy()
-                    display_df['quantity'] = display_df['quantity'].round(2)
-                    display_df.columns = ['Time', 'Settlement Period', 'Predicted Load (MW)']
-                    st.dataframe(display_df, use_container_width=True, height=200)
+                # Predictions table
+                st.columns(1)
+                st.subheader("Predicted Values (Next 48 Periods)")
+                display_df = predictions_df[['startTime', 'settlementPeriod', 'quantity']].copy()
+                display_df['quantity'] = display_df['quantity'].round(2)
+                display_df.columns = ['Time', 'Settlement Period', 'Predicted Load (MW)']
+                st.dataframe(display_df, use_container_width=True, height=200)
 
         # ==================== REGRESSION ANALYSIS ====================
         if analysis_type in ["🔗 Regression Analysis (Forecast vs Actual)", "🎯 All Analyses"] and df_forecast is not None:
