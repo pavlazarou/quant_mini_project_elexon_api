@@ -826,7 +826,6 @@ def main():
         | `elexon_statistical_analysis.py` | 📊 **Statistical Overview** - Today's forecasts |
 
         #### Key Improvements:
-        - ✅ **Dynamic date selection** - No more hardcoded dates! 
         - ✅ **Interactive visualisations** with Plotly (zoom, pan, hover)
         - ✅ **Real-time data fetching** from Elexon API
         - ✅ **All analyses in one place** with easy navigation
